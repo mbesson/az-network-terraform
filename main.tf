@@ -22,6 +22,18 @@ resource "azurerm_resource_group" "databricks-managed-rg" {
   }
 }
 
+# Creating ressource group for devops ressources
+resource "azurerm_resource_group" "devops-rg" {
+  name      = "lo3-we-devops-rg-001"
+  location  = var.resource_group_location
+
+  tags = {
+    "environment" = "UAT"
+    "project" = "Lovelace"
+    "module" = "Devops"
+  }
+}
+
 # Creating ressource group for network resources
 resource "azurerm_resource_group" "network-rg" {
   name      = "lo3-we-network-rg-001"
@@ -105,29 +117,11 @@ resource "azurerm_subnet" "pub-subnet" {
   resource_group_name  = azurerm_resource_group.network-rg.name
   virtual_network_name = azurerm_virtual_network.main-vnet.name
   address_prefixes     = ["10.230.5.128/26"]
-
-  delegation {
-    name = "databricks-delegation"
-
-    service_delegation {
-      name = "Microsoft.Databricks/workspaces"
-      actions = [
-        "Microsoft.Network/virtualNetworks/subnets/join/action",
-        "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
-        "Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action",
-      ]
-    }
-  }
 }
 
 resource "azurerm_subnet_network_security_group_association" "pub-nsg-association" {
   subnet_id                 = azurerm_subnet.pub-subnet.id
   network_security_group_id = azurerm_network_security_group.nsg-001.id
-}
-
-resource "azurerm_subnet_route_table_association" "pub-route-association" {
-  subnet_id      = azurerm_subnet.pub-subnet.id
-  route_table_id = azurerm_route_table.route-001.id
 }
 
 # The private subnet for Databricls
@@ -136,19 +130,6 @@ resource "azurerm_subnet" "prv-subnet" {
   resource_group_name  = azurerm_resource_group.network-rg.name
   virtual_network_name = azurerm_virtual_network.main-vnet.name
   address_prefixes     = ["10.230.5.192/26"]
-
-  delegation {
-    name = "databricks-delegation"
-
-    service_delegation {
-      name = "Microsoft.Databricks/workspaces"
-      actions = [
-        "Microsoft.Network/virtualNetworks/subnets/join/action",
-        "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
-        "Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action",
-      ]
-    }
-  }
 }
 
 resource "azurerm_subnet_network_security_group_association" "prv-nsg-association" {
@@ -156,7 +137,52 @@ resource "azurerm_subnet_network_security_group_association" "prv-nsg-associatio
   network_security_group_id = azurerm_network_security_group.nsg-001.id
 }
 
-resource "azurerm_subnet_route_table_association" "prv-route-association" {
-  subnet_id      = azurerm_subnet.prv-subnet.id
-  route_table_id = azurerm_route_table.route-001.id
+# Create storage account
+resource "azurerm_storage_account" "datalake" {
+  name                     = "lo3westsav2001"
+  resource_group_name      = azurerm_resource_group.main-rg.name
+  location                 = var.resource_group_location
+  account_tier             = "Standard"
+  account_replication_type = "GRS"
+  account_kind = "StorageV2"
+  shared_access_key_enabled = true
+
+  tags = {
+    "environment" = "UAT"
+    "project" = "Lovelace"
+    "module" = "Main"
+  }
+}
+
+# Key vault for datalake usage
+resource "azurerm_key_vault" "kv-datalake" {
+  name                        = "lo3-we-kv-dlk-001"
+  location                    = var.resource_group_location
+  resource_group_name         = azurerm_resource_group.main-rg.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = var.tenant_id
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = true
+
+  sku_name = "standard"
+}
+
+# Key vault for devops usage in current projects
+resource "azurerm_key_vault" "kv-devops" {
+  name                        = "lo3-we-kv-devops-002"
+  location                    = var.resource_group_location
+  resource_group_name         = azurerm_resource_group.devops-rg.name
+  enabled_for_disk_encryption = true
+  tenant_id                   = var.tenant_id
+  soft_delete_retention_days  = 7
+  purge_protection_enabled    = true
+
+  sku_name = "standard"
+}
+
+# Datafactory
+resource "azurerm_data_factory" "adf" {
+  name                = "lo3-we-adf-001-main"
+  location            = var.resource_group_location
+  resource_group_name = azurerm_resource_group.main-rg.name
 }
