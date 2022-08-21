@@ -49,6 +49,40 @@ resource "azurerm_network_security_group" "nsg-001" {
   }
 }
 
+# Route table
+resource "azurerm_route_table" "route-001" {
+  name                          = "lo3-we-nrf-palo-peering-001"
+  location                      = var.resource_group_location
+  resource_group_name           = azurerm_resource_group.network-rg.name
+  disable_bgp_route_propagation = false
+
+  route {
+    name           = "hubvNetPalo"
+    address_prefix = "10.230.0.0/24"
+    next_hop_type  = "VirtualAppliance"
+    next_hop_in_ip_address = "10.230.0.38"
+  }
+
+  route {
+    name           = "InternetPalo"
+    address_prefix = "10.1.0.0/16"
+    next_hop_type  = "VirtualAppliance"
+    next_hop_in_ip_address = "10.230.0.38"
+  }
+
+  route {
+    name           = "ManagementNone"
+    address_prefix = "10.230.0.0/28"
+    next_hop_type  = "None"
+  }
+
+  tags = {
+    "environment" = "UAT"
+    "project" = "Lovelace"
+    "module" = "Network"
+  }
+}
+
 # The main vnet
 resource "azurerm_virtual_network" "main-vnet" {
   name                = "lo3-we-lovelace-vnet-001"
@@ -91,6 +125,11 @@ resource "azurerm_subnet_network_security_group_association" "pub-nsg-associatio
   network_security_group_id = azurerm_network_security_group.nsg-001.id
 }
 
+resource "azurerm_subnet_route_table_association" "pub-route-association" {
+  subnet_id      = azurerm_subnet.pub-subnet.id
+  route_table_id = azurerm_route_table.route-001.id
+}
+
 # The private subnet for Databricls
 resource "azurerm_subnet" "prv-subnet" {
   name                 = "lo3-we-lovelace-sub-prv-001"
@@ -115,4 +154,9 @@ resource "azurerm_subnet" "prv-subnet" {
 resource "azurerm_subnet_network_security_group_association" "prv-nsg-association" {
   subnet_id                 = azurerm_subnet.prv-subnet.id
   network_security_group_id = azurerm_network_security_group.nsg-001.id
+}
+
+resource "azurerm_subnet_route_table_association" "prv-route-association" {
+  subnet_id      = azurerm_subnet.prv-subnet.id
+  route_table_id = azurerm_route_table.route-001.id
 }
