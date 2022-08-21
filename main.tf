@@ -29,12 +29,25 @@ resource "azurerm_resource_group" "network-rg" {
 
   tags = {
     "environment" = "UAT"
-    "project" = "Terraform Network"
+    "project" = "Lovelace"
     "module" = "Network"
   }
 }
 
 # Creating network ressources
+
+# First we create the nsg rule
+resource "azurerm_network_security_group" "nsg-001" {
+  name                = "lo3-we-lovelace-nsg-001"
+  location            = var.resource_group_location
+  resource_group_name = azurerm_resource_group.network-rg.name
+
+  tags = {
+    "environment" = "UAT"
+    "project" = "Lovelace"
+    "module" = "Network"
+  }
+}
 
 # The main vnet
 resource "azurerm_virtual_network" "main-vnet" {
@@ -73,6 +86,11 @@ resource "azurerm_subnet" "pub-subnet" {
   }
 }
 
+resource "azurerm_subnet_network_security_group_association" "pub-nsg-association" {
+  subnet_id                 = azurerm_subnet.pub-subnet.id
+  network_security_group_id = azurerm_network_security_group.nsg-001.id
+}
+
 # The private subnet for Databricls
 resource "azurerm_subnet" "prv-subnet" {
   name                 = "lo3-we-lovelace-sub-prv-001"
@@ -92,4 +110,9 @@ resource "azurerm_subnet" "prv-subnet" {
       ]
     }
   }
+}
+
+resource "azurerm_subnet_network_security_group_association" "prv-nsg-association" {
+  subnet_id                 = azurerm_subnet.prv-subnet.id
+  network_security_group_id = azurerm_network_security_group.nsg-001.id
 }
